@@ -96,7 +96,7 @@ After few minutes you can see deployed jumpbox and rest of infrastructure (appli
 
 ### Test it
 
-Now you can access jumpbox vi ssh (see connection information on VM Overview page).
+Now you can access jumpbox vi ssh (see connection information on VM Overview page) or you can test your whole deployment - go to overview page of Application Gateway in you resource group and access public IP (or FQDN) in web browser.
 
 In jumpbox we have installed in /opt/appsetup folder deployment and redeploy scripts.
 
