@@ -1,0 +1,144 @@
+- name: Playbook to deploy whole infra
+  hosts: localhost
+  connection: local
+  gather_facts: True
+  vars:
+    appsrv: "appsrv01"
+    appgw: "appgw"
+    appsrvsize: "Standard_D1_v2"
+  vars_files:
+    - config.yaml
+
+  tasks:
+  - name: Create security group
+    azure_rm_securitygroup:
+      resource_group: "{{ group }}"
+      name: "{{ appsrv }}-nsg"
+
+  - name: Create NIC
+    azure_rm_networkinterface:
+      resource_group: "{{ group }}"
+      name: "{{ appsrv }}-nic"
+      virtual_network: "{{ vnet }}"
+      subnet: "{{ subnet }}"
+      security_group: "{{ appsrv }}-nsg"
+
+  - name: Make sure srv
+    azure_rm_virtualmachine:
+      resource_group: "{{ group }}"
+      name: "{{ appsrv }}"
+      vm_size: "{{ appsrvsize }}"
+      managed_disk_type: Standard_LRS
+      admin_username: "{{ adminusr }}"
+      ssh_password_enabled: false
+      ssh_public_keys:
+        - path: "/home/{{ adminusr }}/.ssh/authorized_keys"
+          key_data: "{{ adminsshkey }}"
+      network_interfaces: "{{ appsrv }}-nic"
+      os_type: Linux
+      image:
+        offer: CentOS
+        publisher: OpenLogic
+        sku: "7.4"
+        version: latest
+    register: "{{ appsrv }}"
+
+  - name: Print IP
+    debug: msg="Access your Linux VM at {{ appsrv01.ansible_facts.azure_vm.properties.networkProfile.networkInterfaces[0].properties.ipConfigurations[0].properties.privateIPAddress }}"
+
+  - name: Wait for SSH to become available
+    wait_for:
+      port: 22
+      host: "{{ appsrv01.ansible_facts.azure_vm.properties.networkProfile.networkInterfaces[0].properties.ipConfigurations[0].properties.privateIPAddress }}"
+    delegate_to: localhost
+
+  - name: Ensure server is in inventory
+    add_host:
+      hostname: "{{ appsrv01.ansible_facts.azure_vm.properties.networkProfile.networkInterfaces[0].properties.ipConfigurations[0].properties.privateIPAddress }}"
+      group: appservers
+
+## Ensure AppGW and rules
+  - name: Create a public IP address for AppGW
+    azure_rm_publicipaddress:
+      resource_group: "{{ group }}"
+      allocation_method: Dynamic
+      name: "{{ appgw }}-ip"
+
+  - name: Get info of Subnet
+    azure_rm_resource_facts:
+      api_version: '2018-08-01'
+      resource_group: "{{ group }}"
+      provider: network
+      resource_type: virtualnetworks
+      resource_name: "{{ vnet }}"
+      subresource:
+        - type: subnets
+          name: "{{ subnetappgw }}"
+    register: subnetgw
+
+  - name: Create instance of Application Gateway
+    azure_rm_appgateway:
+      resource_group: "{{ group }}"
+      name: "{{ appgw }}"
+      sku:
+        name: standard_small
+        tier: standard
+        capacity: 2
+      gateway_ip_configurations:
+        - subnet:
+            id: "{{ subnetgw.response[0].id }}"
+          name: appGatewayIP
+      frontend_ip_configurations:
+        - public_ip_address: "{{ appgw }}-ip"
+          name: appGatewayFrontendIP
+      frontend_ports:
+        - port: 80
+          name: appGatewayFrontendPort
+      backend_address_pools:
+        - backend_addresses:
+            - ip_address: "{{ appsrv01.ansible_facts.azure_vm.properties.networkProfile.networkInterfaces[0].properties.ipConfigurations[0].properties.privateIPAddress }}"
+          name: appGatewayBackendPool
+      backend_http_settings_collection:
+        - port: 8080
+          protocol: http
+          cookie_based_affinity: disabled
+          name: appGatewayBackendHttpSettings
+      http_listeners:
+        - frontend_ip_configuration: appGatewayFrontendIP
+          frontend_port: appGatewayFrontendPort
+          name: appGatewayHttpListener
+      request_routing_rules:
+        - rule_type: Basic
+          backend_address_pool: appGatewayBackendPool
+          backend_http_settings: appGatewayBackendHttpSettings
+          http_listener: appGatewayHttpListener
+          name: rule1
+
+## Second playbook to configure VM
+- name: Make sure Ansible can access VM
+  hosts: appservers
+  gather_facts: no
+  remote_user: "{{ adminusr }}"
+  become: true
+  vars_files:
+    - config.yaml
+  vars:
+    ansible_os_family: "CentOS"
+    docker_edition: 'ce'
+    docker_package: "docker"
+    docker_package_state: present
+  roles:
+    - geerlingguy.docker
+  tasks:
+  - name: Ensure ansible can access VM
+    ping:
+  - name: Copy file to VM
+    copy:
+      src: "docker.myapp.service"
+      dest: /etc/systemd/system/
+  - name: restart service MyApp
+    systemd:
+      state: restarted
+      daemon_reload: yes
+      name: docker.myapp
+
