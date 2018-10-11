@@ -38,10 +38,9 @@ throw_if_empty --appdocker $APPDOCKER
 ## switch to /opt
 cd /opt
 
-## clone git repo
-git clone https://github.com/valda-z/vm-ansible-autodeploy.git /opt/appsetup
-
 cd appsetup/ansible
+## pull git repo
+git pull 
 
 ## suppress ssh warning
 echo "[defaults]
