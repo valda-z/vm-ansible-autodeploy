@@ -115,6 +115,8 @@
           name: rule1
 
 ## Second playbook to configure VM
+- set_fact:
+    ansible_service_mgr: systemd
 - name: Make sure Ansible can access VM
   hosts: appservers
   gather_facts: no
