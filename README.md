@@ -10,6 +10,8 @@ Applications which runs on application server are dockerized and docker images a
 
 Idea behind for updating application - push new version of application image to registry and use new tag (build or version number) - this new value is than passed to redeploy script which changes systemd definition for our service and restarts service with new version.
 
+![architecture picture](./img/arch.jpg)
+
 ## Prerequisites
 
 In experiment we will create new Service Principal for authentication, new resource group and new VNET with subnets, you can skip these steps if you have already initialized environment.
