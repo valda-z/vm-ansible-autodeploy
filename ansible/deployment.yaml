@@ -81,8 +81,8 @@
       resource_group: "{{ group }}"
       name: "{{ appgw }}"
       sku:
-        name: standard_small
-        tier: standard
+        name: Standrad_v2
+        tier: Standrad_v2
         capacity: 2
       gateway_ip_configurations:
         - subnet:
