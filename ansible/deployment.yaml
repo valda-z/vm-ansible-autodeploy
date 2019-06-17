@@ -44,7 +44,7 @@
         version: latest
 
   - name: Print IP
-    debug: msg="Access your Linux VM at: {{network_interface.ip_configuration.private_ip_address}} "
+    debug: msg="Access your Linux VM at {{network_interface.ip_configuration.private_ip_address}} "
 
   - name: Wait for SSH to become available
     wait_for:
