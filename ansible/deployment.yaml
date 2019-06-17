@@ -49,12 +49,12 @@
   - name: Wait for SSH to become available
     wait_for:
       port: 22
-      host: "{{network_interface.ip_configuration.private_ip_address}}"
+      host: "{{network_interface.state.ip_configurations[0].private_ip_address}}"
     delegate_to: localhost
 
   - name: Ensure server is in inventory
     add_host:
-      hostname: "{{network_interface.ip_configuration.private_ip_address}}"
+      hostname: "{{network_interface.state.ip_configurations[0].private_ip_address}}"
       group: appservers
 
 ## Ensure AppGW and rules
@@ -96,7 +96,7 @@
           name: appGatewayFrontendPort
       backend_address_pools:
         - backend_addresses:
-            - ip_address: "{{ appsrv01.ansible_facts.azure_vm.properties.networkProfile.networkInterfaces[0].properties.ipConfigurations[0].properties.privateIPAddress }}"
+            - ip_address: "{{ network_interface.state.ip_configurations[0].private_ip_address }}"
           name: appGatewayBackendPool
       backend_http_settings_collection:
         - port: 8080
